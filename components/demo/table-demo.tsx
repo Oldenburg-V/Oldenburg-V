@@ -38,6 +38,12 @@ export function TableDemo() {
   const dealt = useMemo(() => state.cards.some((c) => c.zone.type !== "deck"), [state.cards])
   const yourHand = handCards(state, "you")
 
+  // Shuffle client-side after mount so SSR and hydration render an identical
+  // ordered deck (avoids hydration mismatch from Math.random during render).
+  useEffect(() => {
+    dispatch({ type: "shuffle" })
+  }, [])
+
   // Build PlayerInfo for the table framework, enriched with live stats.
   const players: PlayerInfo[] = state.players.map((p) => ({
     id: p.id,

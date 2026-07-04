@@ -51,7 +51,9 @@ export function makePlayers(count: number): PlayerMeta[] {
 
 export function initState(playerCount = 4, openOpponents = false): DemoState {
   const players = makePlayers(playerCount)
-  const deck: CardState[] = shuffle(buildDeck(1, false)).map((c: CardData) => ({
+  // Ordered (unshuffled) so server and first client render match. We shuffle
+  // client-side on mount via the `shuffle` action to avoid hydration mismatches.
+  const deck: CardState[] = buildDeck(1, false).map((c: CardData) => ({
     ...c,
     zone: { type: "deck" as const },
   }))
@@ -78,6 +80,7 @@ export const currentPlayer = (s: DemoState) => s.players[s.turn]
 // ---- actions ----
 export type DemoAction =
   | { type: "reset"; playerCount?: number; openOpponents?: boolean }
+  | { type: "shuffle" }
   | { type: "setOpen"; open: boolean }
   | { type: "dealOne"; playerId: string }
   | { type: "playCard"; cardId: string }
@@ -100,6 +103,12 @@ export function demoReducer(s: DemoState, a: DemoAction): DemoState {
   switch (a.type) {
     case "reset":
       return initState(a.playerCount ?? s.players.length, a.openOpponents ?? s.openOpponents)
+
+    case "shuffle": {
+      // Only shuffle while every card is still in the deck (fresh, undealt table).
+      if (s.cards.some((c) => c.zone.type !== "deck")) return s
+      return { ...s, cards: shuffle(s.cards) }
+    }
 
     case "setOpen": {
       // flip currently-dealt opponent hands to match the new setting

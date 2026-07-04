@@ -1,6 +1,7 @@
 "use client"
 
 import { forwardRef } from "react"
+import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
 type Variant = "gold" | "outline" | "ghost" | "crimson"
@@ -22,12 +23,14 @@ const sizes: Record<Size, string> = {
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
+  asChild?: boolean
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "gold", size = "md", ...props }, ref) => {
+  ({ className, variant = "gold", size = "md", asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
     return (
-      <button
+      <Comp
         ref={ref}
         className={cn(
           "inline-flex items-center justify-center gap-2 rounded-lg font-display font-semibold tracking-wide transition-all",

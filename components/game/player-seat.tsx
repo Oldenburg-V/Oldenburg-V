@@ -1,6 +1,5 @@
 "use client"
 
-import { motion } from "motion/react"
 import type { PlayerInfo, StatTone } from "@/lib/game-types"
 import { cn } from "@/lib/utils"
 
@@ -19,6 +18,7 @@ const avatarTone: Record<StatTone, string> = {
 }
 
 function initials(name: string) {
+  if (!name || typeof name !== "string") return "?"
   return name
     .split(/\s+/)
     .map((w) => w[0])
@@ -32,6 +32,7 @@ export interface PlayerSeatProps {
   active?: boolean
   /** Layout the badge vertically (opponents) or as a wide bar (you). */
   variant?: "compact" | "wide"
+  onClick?: () => void
   className?: string
 }
 
@@ -39,15 +40,19 @@ export function PlayerSeat({
   player,
   active = false,
   variant = "compact",
+  onClick,
   className,
 }: PlayerSeatProps) {
   const accent = player.accent ?? "default"
 
   return (
     <div
+      id={`seat-${player.id}`}
+      onClick={onClick}
       className={cn(
-        "flex items-center gap-2.5 rounded-2xl border bg-popover/80 px-3 py-2 backdrop-blur-sm transition-colors",
+        "flex items-center gap-2.5 rounded-2xl border bg-popover/80 px-3 py-2 backdrop-blur-sm transition-all duration-200",
         active ? "border-primary/70 bg-popover" : "border-border/60",
+        onClick && "cursor-pointer hover:bg-popover/90 active:scale-98 ring-2 ring-amber-500/60 border-amber-500/40 animate-pulse shadow-[0_0_12px_rgba(245,158,11,0.15)]",
         player.out && "opacity-45 grayscale",
         variant === "wide" && "px-3.5 py-2.5",
         className,
@@ -60,26 +65,41 @@ export function PlayerSeat({
     >
       <div className="relative shrink-0">
         {active && (
-          <motion.span
-            aria-hidden
-            className="absolute -inset-1 rounded-full ring-2 ring-primary"
-            animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.06, 1] }}
-            transition={{ duration: 1.8, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-          />
+          <>
+            <style>{`
+              @keyframes avatarPulse {
+                0%, 100% { opacity: 0.4; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.06); }
+              }
+            `}</style>
+            <span
+              aria-hidden
+              className="absolute -inset-1 rounded-full ring-2 ring-primary pointer-events-none"
+              style={{ animation: "avatarPulse 1.8s ease-in-out infinite" }}
+            />
+          </>
         )}
-        <div
-          className={cn(
-            "grid size-9 place-items-center rounded-full bg-gradient-to-b font-display text-sm font-bold shadow-inner",
-            avatarTone[accent],
-          )}
-        >
-          {initials(player.name)}
-        </div>
+        {player.avatarUrl ? (
+          <img
+            src={player.avatarUrl}
+            alt={player.name}
+            className="size-9 rounded-full object-cover border border-primary/20 shadow-[0_0_8px_rgba(245,158,11,0.15)]"
+          />
+        ) : (
+          <div
+            className={cn(
+              "grid size-9 place-items-center rounded-full bg-gradient-to-b font-display text-sm font-bold shadow-inner",
+              avatarTone[accent],
+            )}
+          >
+            {initials(player.name)}
+          </div>
+        )}
       </div>
 
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="truncate font-display text-sm font-semibold leading-tight tracking-wide">
+          <span className="truncate text-sm font-semibold leading-tight tracking-wide">
             {player.name}
           </span>
           {player.isYou && (

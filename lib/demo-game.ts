@@ -11,6 +11,7 @@ export interface PlayerMeta {
   name: string
   accent: StatTone
   isYou: boolean
+  avatarUrl?: string
 }
 
 export interface DemoState {
@@ -49,8 +50,22 @@ export function makePlayers(count: number): PlayerMeta[] {
   return players
 }
 
-export function initState(playerCount = 4, openOpponents = false): DemoState {
-  const players = makePlayers(playerCount)
+export function initState(
+  playerCount = 4,
+  openOpponents = false,
+  customPlayerNames?: string[]
+): DemoState {
+  let players = makePlayers(playerCount)
+  if (customPlayerNames && customPlayerNames.length > 0) {
+    const accents: StatTone[] = ["gold", "crimson", "gem", "default"]
+    players = customPlayerNames.map((name, i) => ({
+      id: i === 0 ? "you" : `p${i}`,
+      name: name === "YOU" || name === "You" ? "You" : name,
+      accent: accents[i % accents.length],
+      isYou: i === 0,
+    }))
+  }
+
   // Ordered (unshuffled) so server and first client render match. We shuffle
   // client-side on mount via the `shuffle` action to avoid hydration mismatches.
   const deck: CardState[] = buildDeck(1, false).map((c: CardData) => ({
@@ -72,9 +87,11 @@ export function initState(playerCount = 4, openOpponents = false): DemoState {
 export const deckCards = (s: DemoState) => s.cards.filter((c) => c.zone.type === "deck")
 export const handCards = (s: DemoState, pid: string) =>
   s.cards.filter((c) => c.zone.type === "hand" && c.zone.playerId === pid)
-export const playCards = (s: DemoState) => s.cards.filter((c) => c.zone.type === "play")
+export const play1Cards = (s: DemoState) => s.cards.filter((c) => c.zone.type === "play1")
+export const play2Cards = (s: DemoState) => s.cards.filter((c) => c.zone.type === "play2")
 export const discardCards = (s: DemoState) =>
   s.cards.filter((c) => c.zone.type === "discard")
+export const potCards = (s: DemoState) => s.cards.filter((c) => c.zone.type === "pot")
 export const currentPlayer = (s: DemoState) => s.players[s.turn]
 
 // ---- actions ----
@@ -83,12 +100,16 @@ export type DemoAction =
   | { type: "shuffle" }
   | { type: "setOpen"; open: boolean }
   | { type: "dealOne"; playerId: string }
-  | { type: "playCard"; cardId: string }
+  | { type: "playCard"; cardId: string; targetZone: "play1" | "play2" }
+  | { type: "discardCard"; cardId: string }
+  | { type: "betCard"; cardId: string }
   | { type: "opponentPlay"; playerId: string }
   | { type: "draw"; playerId: string }
   | { type: "collect" }
   | { type: "nextTurn" }
   | { type: "reshuffle" }
+  | { type: "addSips"; playerId: string; amount: number }
+  | { type: "gatherToDeck" }
 
 function topDeckCard(s: DemoState): CardState | undefined {
   const deck = deckCards(s)
@@ -137,9 +158,31 @@ export function demoReducer(s: DemoState, a: DemoAction): DemoState {
       const owner = card.zone.playerId
       return {
         ...s,
-        cards: update(s, a.cardId, { zone: { type: "play", playerId: owner }, faceUp: true }),
+        cards: update(s, a.cardId, { zone: { type: a.targetZone, playerId: owner }, faceUp: true }),
         sips: { ...s.sips, [owner]: (s.sips[owner] ?? 0) + RANK_VALUE[card.rank] },
-        message: `${nameOf(s, owner)} plays ${card.rank.toUpperCase()}.`,
+        message: `${nameOf(s, owner)} plays ${card.rank.toUpperCase()} to ${a.targetZone === "play1" ? "Table 1" : "Table 2"}.`,
+      }
+    }
+
+    case "discardCard": {
+      const card = s.cards.find((c) => c.id === a.cardId)
+      if (!card || card.zone.type !== "hand") return s
+      const owner = card.zone.playerId
+      return {
+        ...s,
+        cards: update(s, a.cardId, { zone: { type: "discard" as const }, faceUp: true }),
+        message: `${nameOf(s, owner)} discards ${card.rank.toUpperCase()}.`,
+      }
+    }
+
+    case "betCard": {
+      const card = s.cards.find((c) => c.id === a.cardId)
+      if (!card || card.zone.type !== "hand") return s
+      const owner = card.zone.playerId
+      return {
+        ...s,
+        cards: update(s, a.cardId, { zone: { type: "pot" as const }, faceUp: true }),
+        message: `${nameOf(s, owner)} bets ${card.rank.toUpperCase()} into the pot.`,
       }
     }
 
@@ -160,11 +203,14 @@ export function demoReducer(s: DemoState, a: DemoAction): DemoState {
       }
       // play the highest card for a bit of "strategy"
       const pick = [...hand].sort((x, y) => RANK_VALUE[y.rank] - RANK_VALUE[x.rank])[0]
+      const count1 = s.cards.filter((c) => c.zone.type === "play1").length
+      const count2 = s.cards.filter((c) => c.zone.type === "play2").length
+      const targetZone = count1 <= count2 ? "play1" : "play2"
       return {
         ...s,
-        cards: update(s, pick.id, { zone: { type: "play", playerId: a.playerId }, faceUp: true }),
+        cards: update(s, pick.id, { zone: { type: targetZone, playerId: a.playerId }, faceUp: true }),
         sips: { ...s.sips, [a.playerId]: (s.sips[a.playerId] ?? 0) + RANK_VALUE[pick.rank] },
-        message: `${nameOf(s, a.playerId)} plays ${pick.rank.toUpperCase()}.`,
+        message: `${nameOf(s, a.playerId)} plays ${pick.rank.toUpperCase()} to ${targetZone === "play1" ? "Table 1" : "Table 2"}.`,
       }
     }
 
@@ -180,12 +226,33 @@ export function demoReducer(s: DemoState, a: DemoAction): DemoState {
     }
 
     case "collect": {
-      const inPlay = playCards(s)
-      if (inPlay.length === 0) return s
+      const count1 = s.cards.filter((c) => c.zone.type === "play1").length
+      const count2 = s.cards.filter((c) => c.zone.type === "play2").length
+      if (count1 === 0 && count2 === 0) return s
       const cards = s.cards.map((c) =>
-        c.zone.type === "play" ? { ...c, zone: { type: "discard" as const }, faceUp: true } : c,
+        c.zone.type === "play1" || c.zone.type === "play2"
+          ? { ...c, zone: { type: "discard" as const }, faceUp: true }
+          : c,
       )
-      return { ...s, cards, message: "Trick collected." }
+      return { ...s, cards, message: "Tricks collected." }
+    }
+    case "addSips": {
+      return {
+        ...s,
+        sips: { ...s.sips, [a.playerId]: (s.sips[a.playerId] ?? 0) + a.amount },
+      }
+    }
+    case "gatherToDeck": {
+      const cards = s.cards.map((c) => ({
+        ...c,
+        zone: { type: "deck" as const },
+        faceUp: false,
+      }))
+      return {
+        ...s,
+        cards,
+        message: "Gathering cards to deck...",
+      }
     }
 
     case "nextTurn":

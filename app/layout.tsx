@@ -26,6 +26,8 @@ export const viewport: Viewport = {
   userScalable: false,
 }
 
+import { LanguageProvider } from "@/lib/i18n"
+
 export default function RootLayout({
   children,
 }: {
@@ -34,9 +36,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`bg-background ${cinzel.variable} ${geist.variable} ${geistMono.variable}`}
     >
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <LanguageProvider>{children}</LanguageProvider>
+      </body>
     </html>
   )
 }

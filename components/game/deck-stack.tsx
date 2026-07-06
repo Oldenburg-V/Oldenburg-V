@@ -64,6 +64,7 @@ export function DeckStack({
         {/* live top card */}
         {top ? (
           <div
+            key={top.id}
             className="absolute"
             style={{ left: layers * 2, top: layers * 2 }}
           >

@@ -2,16 +2,15 @@
 
 import { cn } from "@/lib/utils"
 
-export interface PlayZoneProps {
+export interface PlayZoneProps extends React.HTMLAttributes<HTMLDivElement> {
   label?: string
   /** Glow to signal an active drop target / current focus. */
   active?: boolean
   children?: React.ReactNode
-  className?: string
 }
 
 /** A felt panel used as the central (or per-player) play surface. */
-export function PlayZone({ label, active = false, children, className }: PlayZoneProps) {
+export function PlayZone({ label, active = false, children, className, ...props }: PlayZoneProps) {
   return (
     <div
       className={cn(
@@ -26,6 +25,7 @@ export function PlayZone({ label, active = false, children, className }: PlayZon
           ? "inset 0 0 40px oklch(0.78 0.13 82 / 0.18), 0 0 0 1px oklch(0.78 0.13 82 / 0.35)"
           : "inset 0 0 40px oklch(0 0 0 / 0.45)",
       }}
+      {...props}
     >
       {label && (
         <span className="pointer-events-none absolute left-3 top-2 font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/70">

@@ -21,14 +21,18 @@ export interface PlayerInfo {
   accent?: StatTone
   /** Marks a player as eliminated / folded. */
   out?: boolean
+  /** Real profile image URL from social logins */
+  avatarUrl?: string
 }
 
 /** Where a card currently lives. Drives shared-layout animations. */
 export type CardZone =
   | { type: "deck" }
   | { type: "hand"; playerId: string }
-  | { type: "play"; playerId?: string }
+  | { type: "play1"; playerId?: string }
+  | { type: "play2"; playerId?: string }
   | { type: "discard" }
+  | { type: "pot" }
 
 export interface CardState extends CardData {
   zone: CardZone

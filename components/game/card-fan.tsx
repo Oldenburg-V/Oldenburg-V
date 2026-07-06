@@ -1,6 +1,6 @@
 "use client"
 
-import { AnimatePresence } from "motion/react"
+import { motion } from "motion/react"
 import { type CardData, type CardBack } from "@/lib/deck"
 import { PlayingCard } from "./playing-card"
 import { cn } from "@/lib/utils"
@@ -21,6 +21,13 @@ export interface CardFanProps {
   disabledIds?: string[]
   onCardClick?: (card: CardData) => void
   className?: string
+  // Drag and drop properties
+  drag?: boolean
+  draggedCardId?: string | null
+  hoveredZoneId?: string | null
+  onDragStart?: (cardId: string) => void
+  onDrag?: (event: any, info: any, cardId: string) => void
+  onDragEnd?: (cardId: string) => void
 }
 
 export function CardFan({
@@ -36,6 +43,12 @@ export function CardFan({
   disabledIds = [],
   onCardClick,
   className,
+  drag = false,
+  draggedCardId = null,
+  hoveredZoneId = null,
+  onDragStart,
+  onDrag,
+  onDragEnd,
 }: CardFanProps) {
   const n = cards.length
   const mid = (n - 1) / 2
@@ -45,33 +58,39 @@ export function CardFan({
 
   return (
     <div className={cn("flex items-end justify-center", className)}>
-      <AnimatePresence mode="popLayout">
-        {cards.map((card, i) => {
-          const dist = i - mid
-          const rotate = dist * anglePer
-          // parabolic dip: center sits highest, edges fall away
-          const offsetY = mid === 0 ? 0 : (dist / (mid || 1)) ** 2 * curve
-          return (
-            <div
-              key={card.id}
-              style={{ marginLeft: i === 0 ? 0 : -(cardWidth - step), zIndex: i }}
-            >
-              <PlayingCard
-                card={card}
-                width={cardWidth}
-                back={back}
-                rotate={rotate}
-                offsetY={offsetY}
-                interactive={interactive}
-                disabled={disabledIds.includes(card.id)}
-                selected={selectedIds.includes(card.id)}
-                highlighted={highlightedIds.includes(card.id)}
-                onClick={onCardClick ? () => onCardClick(card) : undefined}
-              />
-            </div>
-          )
-        })}
-      </AnimatePresence>
+      {cards.map((card, i) => {
+        const dist = i - mid
+        const rotate = dist * anglePer
+        // parabolic dip: center sits highest, edges fall away
+        const offsetY = mid === 0 ? 0 : (dist / (mid || 1)) ** 2 * curve
+        const isCardDisabled = disabledIds.includes(card.id)
+        return (
+          <motion.div
+            key={card.id}
+            layout
+            style={{ marginLeft: i === 0 ? 0 : -(cardWidth - step), zIndex: i }}
+          >
+            <PlayingCard
+              card={card}
+              width={cardWidth}
+              back={back}
+              rotate={rotate}
+              offsetY={offsetY}
+              interactive={interactive}
+              disabled={isCardDisabled}
+              selected={selectedIds.includes(card.id)}
+              highlighted={highlightedIds.includes(card.id)}
+              onClick={onCardClick ? () => onCardClick(card) : undefined}
+              drag={drag && !isCardDisabled}
+              dragSnapToOrigin
+              dragHovered={draggedCardId === card.id && hoveredZoneId !== null}
+              onDragStart={(e, info) => onDragStart?.(card.id)}
+              onDrag={(e, info) => onDrag?.(e, info, card.id)}
+              onDragEnd={() => onDragEnd?.(card.id)}
+            />
+          </motion.div>
+        )
+      })}
     </div>
   )
 }

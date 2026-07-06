@@ -22,6 +22,13 @@ export interface PlayingCardProps {
   onClick?: () => void
   className?: string
   style?: React.CSSProperties
+  // Drag and drop properties
+  drag?: boolean | "x" | "y"
+  dragSnapToOrigin?: boolean
+  dragHovered?: boolean
+  onDragStart?: (event: any, info: any) => void
+  onDrag?: (event: any, info: any) => void
+  onDragEnd?: (event: any, info: any) => void
 }
 
 export function PlayingCard({
@@ -38,18 +45,48 @@ export function PlayingCard({
   onClick,
   className,
   style,
+  drag = false,
+  dragSnapToOrigin = false,
+  dragHovered = false,
+  onDragStart,
+  onDrag,
+  onDragEnd,
 }: PlayingCardProps) {
   const height = Math.round(width * 1.5)
 
   return (
     <motion.div
+      id={`card-${card.id}`}
       layout={animateLayout}
       layoutId={animateLayout ? card.id : undefined}
       transition={{ type: "spring", stiffness: 380, damping: 34, mass: 0.6 }}
-      onClick={disabled ? undefined : onClick}
-      animate={{ rotate, y: offsetY }}
-      whileHover={interactive && !disabled ? { y: offsetY - 16, scale: 1.04, zIndex: 50 } : undefined}
+      onTap={disabled ? undefined : () => onClick?.()}
+      onClick={(e) => {
+        e.stopPropagation()
+      }}
+      animate={dragHovered && !disabled ? {
+        scale: 1.12,
+        boxShadow: "0 0 25px oklch(0.78 0.13 82 / 0.85), 0 12px 30px oklch(0 0 0 / 0.5)",
+        rotate,
+        y: offsetY
+      } : {
+        rotate,
+        y: offsetY
+      }}
+      whileHover={interactive && !disabled ? { y: offsetY - 28, scale: 1.1, zIndex: 90 } : undefined}
       whileTap={interactive && !disabled ? { scale: 0.98 } : undefined}
+      whileDrag={{
+        scale: 1.08,
+        zIndex: 100,
+        boxShadow: "0 20px 40px oklch(0 0 0 / 0.6)",
+      }}
+      drag={drag}
+      dragSnapToOrigin={dragSnapToOrigin}
+      onDragStart={onDragStart}
+      onDrag={onDrag}
+      onDragEnd={onDragEnd}
+      dragElastic={0.1}
+      dragTransition={{ bounceStiffness: 600, bounceDamping: 30 }}
       className={cn(
         "relative shrink-0 select-none rounded-[7%]",
         interactive && !disabled && "cursor-pointer",
